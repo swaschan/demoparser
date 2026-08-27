@@ -149,7 +149,7 @@ pub struct VoiceData {
 
 #[napi]
 pub fn parse_voice(path_or_buf: Either<String, Buffer>) -> napi::Result<Vec<VoiceData>> {
-  let bytes = resolve_byte_type(path_or_buf).unwrap();
+  let bytes = resolve_byte_type(path_or_buf)?;
   let settings = ParserInputs {
     wanted_players: vec![],
     wanted_player_props: vec![],

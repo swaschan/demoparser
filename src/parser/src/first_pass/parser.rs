@@ -79,6 +79,9 @@ pub struct Frame {
 
 impl<'a> FirstPassParser<'a> {
     pub fn parse_header_only(&mut self, demo_bytes: &'a [u8]) -> Result<AHashMap<String, String>, DemoParserError> {
+        if demo_bytes.len() < HEADER_ENDS_AT_BYTE {
+            return Err(DemoParserError::OutOfBytesError);
+        }
         self.handle_short_header(demo_bytes.len(), &demo_bytes[..HEADER_ENDS_AT_BYTE])?;
         let frame = self.read_frame(demo_bytes)?;
         let bytes = self.slice_packet_bytes(demo_bytes, frame.size)?;
@@ -89,35 +92,27 @@ impl<'a> FirstPassParser<'a> {
         Ok(self.header.clone())
     }
     pub fn parse_demo(&mut self, demo_bytes: &'a [u8], exit_early: bool) -> Result<FirstPassOutput, DemoParserError> {
+        if demo_bytes.len() < HEADER_ENDS_AT_BYTE {
+            return Err(DemoParserError::OutOfBytesError);
+        }
         self.handle_short_header(demo_bytes.len(), &demo_bytes[..HEADER_ENDS_AT_BYTE])?;
         let mut reuseable_buffer = vec![0_u8; 100_000];
         // Loop that goes trough the entire file
         loop {
-            // Need at least a few bytes to read frame header (3 varints, minimum 1 byte each)
-            if self.ptr + 3 > demo_bytes.len() {
+            if self.ptr == demo_bytes.len() {
                 break;
             }
             if exit_early && self.cls_by_id.is_some() && !self.ge_list.is_empty() {
                 break;
             }
-            let frame = match self.read_frame(demo_bytes) {
-                Ok(f) => f,
-                Err(DemoParserError::OutOfBytesError) => break,
-                Err(e) => return Err(e),
-            };
+            let frame = self.read_frame(demo_bytes)?;
+            let bytes = self.slice_packet_bytes(demo_bytes, frame.size)?;
             if self.is_packet_we_skip_on_first_pass(frame.demo_cmd) {
-                self.ptr += frame.size;
+                self.ptr = self.ptr.checked_add(frame.size).ok_or(DemoParserError::MalformedMessage)?;
                 continue;
             }
-            let bytes = match self.slice_packet_bytes(demo_bytes, frame.size) {
-                Ok(b) => b,
-                Err(_) => {
-                    self.ptr += frame.size;
-                    continue;
-                }
-            };
             let bytes = self.decompress_if_needed(&mut reuseable_buffer, bytes, &frame)?;
-            self.ptr += frame.size;
+            self.ptr = self.ptr.checked_add(frame.size).ok_or(DemoParserError::MalformedMessage)?;
             match frame.demo_cmd {
                 EDemoCommands::DemSendTables => self.parse_sendtable_bytes(bytes)?,
                 EDemoCommands::DemFileHeader => self.parse_header(bytes)?,
@@ -162,10 +157,11 @@ impl<'a> FirstPassParser<'a> {
         demo_cmd == EDemoCommands::DemPacket || demo_cmd == EDemoCommands::DemAnimationData
     }
     fn slice_packet_bytes(&mut self, demo_bytes: &'a [u8], frame_size: usize) -> Result<&'a [u8], DemoParserError> {
-        if self.ptr + frame_size as usize >= demo_bytes.len() {
+        let frame_ends_at = self.ptr.checked_add(frame_size).ok_or(DemoParserError::MalformedMessage)?;
+        if frame_ends_at > demo_bytes.len() {
             return Err(DemoParserError::MalformedMessage);
         }
-        Ok(&demo_bytes[self.ptr..self.ptr + frame_size])
+        Ok(&demo_bytes[self.ptr..frame_ends_at])
     }
     fn decompress_if_needed<'b>(&mut self, buf: &'b mut Vec<u8>, possibly_uncompressed_bytes: &'b [u8], frame: &Frame) -> Result<&'b [u8], DemoParserError> {
         match frame.is_compressed {
@@ -397,7 +393,8 @@ impl<'a> FirstPassParser<'a> {
             let network_name = class_t.network_name();
 
             if let Some(ser) = serializers.remove(network_name) {
-                cls_by_id[cls_id as usize] = Class {
+                let class = cls_by_id.get_mut(cls_id as usize).ok_or(DemoParserError::MalformedMessage)?;
+                *class = Class {
                     class_id: cls_id,
                     name: network_name.to_string(),
                     serializer: ser,

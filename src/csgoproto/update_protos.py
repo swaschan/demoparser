@@ -1,22 +1,42 @@
+import os
+from pathlib import Path
 import subprocess
+import tempfile
 
-repo_url = "https://github.com/SteamDatabase/GameTracking-CS2/"
+REPO_URL = "https://github.com/SteamDatabase/GameTracking-CS2.git"
+REPO_REVISION = "61e6f2a613357c7e70de957cf41e06ef840ff6ba"
+CRATE_DIR = Path(__file__).resolve().parent
 
 
-try:
-    # Run the git clone command
-    subprocess.run(["git", "clone", repo_url, "--depth=1"], check=True)
-    print(f"Successfully cloned {repo_url}")
-except subprocess.CalledProcessError as e:
-    print(f"An error occurred while cloning the repository: {e}")
-except FileNotFoundError:
-    print("Git is not installed or not found in the system's PATH.")
+with tempfile.TemporaryDirectory() as temporary_directory:
+    checkout = Path(temporary_directory) / "GameTracking-CS2"
+    subprocess.run(["git", "init", str(checkout)], check=True)
+    subprocess.run(
+        ["git", "-C", str(checkout), "remote", "add", "origin", REPO_URL],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(checkout),
+            "fetch",
+            "--depth=1",
+            "origin",
+            REPO_REVISION,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(checkout), "checkout", "--detach", "FETCH_HEAD"],
+        check=True,
+    )
 
-try:
-    # Run the cargo run --release command
-    result = subprocess.run(["cargo", "run", "--release"], check=True)
-    print("Cargo run completed successfully.")
-except subprocess.CalledProcessError as e:
-    print(f"An error occurred while running the Cargo command: {e}")
-except FileNotFoundError:
-    print("Cargo is not installed or not found in the system's PATH.")
+    environment = os.environ.copy()
+    environment["CSGOPROTO_REGENERATE"] = "1"
+    environment["CSGOPROTO_PROTO_DIR"] = str(checkout / "Protobufs")
+    subprocess.run(
+        ["cargo", "build", "--manifest-path", str(CRATE_DIR / "Cargo.toml")],
+        check=True,
+        env=environment,
+    )

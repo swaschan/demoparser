@@ -1271,7 +1271,7 @@ fn find_type_of_vals(pairs: &Vec<&EventField>) -> Result<Option<Variant>, DemoPa
             Some(Variant::U32(u)) => Some(Variant::U32(*u)),
             Some(Variant::StringVec(_u)) => Some(Variant::StringVec(vec![])),
             Some(Variant::U64Vec(_u)) => Some(Variant::U64Vec(vec![])),
-            Some(Variant::U32Vec(_u)) => Some(Variant::U64Vec(vec![])),
+            Some(Variant::U32Vec(_u)) => Some(Variant::U32Vec(vec![])),
             Some(Variant::Stickers(_u)) => Some(Variant::Stickers(vec![])),
             Some(Variant::VecXYZ(_u)) => Some(Variant::VecXYZ([0.0; 3])),
             Some(Variant::VecXY(_u)) => Some(Variant::VecXY([0.0; 2])),

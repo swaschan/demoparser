@@ -136,6 +136,10 @@ impl<'a> Bitreader<'a> {
         Ok(self.read_nbits(1)? != 0)
     }
     pub fn read_n_bytes(&mut self, n: usize) -> Result<Vec<u8>, DemoParserError> {
+        let requested_bits = n.checked_mul(8).ok_or(DemoParserError::OutOfBytesError)?;
+        if self.reader.bits_remaining().ok_or(DemoParserError::OutOfBytesError)? < requested_bits {
+            return Err(DemoParserError::OutOfBytesError);
+        }
         let mut bytes = vec![0_u8; n];
         match self.reader.read_bytes(&mut bytes) {
             true => {

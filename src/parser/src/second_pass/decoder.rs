@@ -155,7 +155,7 @@ impl<'a> Bitreader<'a> {
     pub fn decode_normal(&mut self) -> Result<f32, DemoParserError> {
         let is_neg = self.read_boolean()?;
         let len = self.read_nbits(11)?;
-        let result = (len as f64 * (1.0 / ((1 << 11) as f64) - 1.0)) as f32;
+        let result = (len as f64 * (1.0 / (((1 << 11) - 1) as f64))) as f32;
         match is_neg {
             true => Ok(-result),
             false => Ok(result),

@@ -1,32 +1,32 @@
-use std::{io::Result, process::Command};
+use std::{env, io::Result, path::PathBuf};
+
+const PROTO_FILES: &[&str] = &[
+    "steammessages.proto",
+    "gcsdk_gcmessages.proto",
+    "demo.proto",
+    "cstrike15_gcmessages.proto",
+    "cstrike15_usermessages.proto",
+    "usermessages.proto",
+    "networkbasetypes.proto",
+    "engine_gcmessages.proto",
+    "netmessages.proto",
+    "network_connection.proto",
+    "cs_usercmd.proto",
+    "usercmd.proto",
+    "gameevents.proto",
+    "cs_gameevents.proto",
+];
 
 fn main() -> Result<()> {
-    println!("cargo::rerun-if-changed=GameTracking-CS2/Protobufs/demo.proto");
+    println!("cargo::rerun-if-env-changed=CSGOPROTO_REGENERATE");
+    println!("cargo::rerun-if-env-changed=CSGOPROTO_PROTO_DIR");
 
-    Command::new("git")
-        .args([
-            "clone",
-            "https://github.com/SteamDatabase/GameTracking-CS2.git",
-            "--depth=1",
-        ])
-        .status()?;
+    if env::var_os("CSGOPROTO_REGENERATE").is_none() {
+        return Ok(());
+    }
 
-    let protos = vec![
-        "GameTracking-CS2/Protobufs/steammessages.proto",
-        "GameTracking-CS2/Protobufs/gcsdk_gcmessages.proto",
-        "GameTracking-CS2/Protobufs/demo.proto",
-        "GameTracking-CS2/Protobufs/cstrike15_gcmessages.proto",
-        "GameTracking-CS2/Protobufs/cstrike15_usermessages.proto",
-        "GameTracking-CS2/Protobufs/usermessages.proto",
-        "GameTracking-CS2/Protobufs/networkbasetypes.proto",
-        "GameTracking-CS2/Protobufs/engine_gcmessages.proto",
-        "GameTracking-CS2/Protobufs/netmessages.proto",
-        "GameTracking-CS2/Protobufs/network_connection.proto",
-        "GameTracking-CS2/Protobufs/cs_usercmd.proto",
-        "GameTracking-CS2/Protobufs/usercmd.proto",
-        "GameTracking-CS2/Protobufs/gameevents.proto",
-        "GameTracking-CS2/Protobufs/cs_gameevents.proto",
-    ];
+    let proto_dir = PathBuf::from(env::var_os("CSGOPROTO_PROTO_DIR").expect("CSGOPROTO_PROTO_DIR must be set"));
+    let protos: Vec<_> = PROTO_FILES.iter().map(|file| proto_dir.join(file)).collect();
 
     prost_build::Config::new()
         .format(false)
@@ -34,5 +34,5 @@ fn main() -> Result<()> {
         .default_package_filename("protobuf")
         .bytes(["."])
         .enum_attribute(".", "#[derive(::strum::EnumIter)]")
-        .compile_protos(&protos, &["GameTracking-CS2/Protobufs/"])
+        .compile_protos(&protos, &[proto_dir])
 }

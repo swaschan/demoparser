@@ -87,28 +87,17 @@ impl<'a> SecondPassParser<'a> {
         let mut buf2 = vec![0_u8; OUTER_BUF_DEFAULT_LEN];
 
         loop {
-            // Need at least a few bytes to read frame header (3 varints, minimum 1 byte each)
-            if self.ptr + 3 > demo_bytes.len() {
+            if self.ptr == demo_bytes.len() {
                 break;
             }
-            let frame = match self.read_frame(demo_bytes) {
-                Ok(f) => f,
-                Err(DemoParserError::OutOfBytesError) => break,
-                Err(e) => return Err(e),
-            };
+            let frame = self.read_frame(demo_bytes)?;
+            let bytes = self.slice_packet_bytes(demo_bytes, frame.size)?;
             if frame.demo_cmd == DemAnimationData || frame.demo_cmd == DemSendTables || frame.demo_cmd == DemStringTables {
-                self.ptr += frame.size as usize;
+                self.ptr = self.ptr.checked_add(frame.size).ok_or(DemoParserError::MalformedMessage)?;
                 continue;
             }
-            let bytes = match self.slice_packet_bytes(demo_bytes, frame.size) {
-                Ok(b) => b,
-                Err(_) => {
-                    self.ptr += frame.size;
-                    continue;
-                }
-            };
             let bytes = self.decompress_if_needed(&mut buf, bytes, &frame)?;
-            self.ptr += frame.size;
+            self.ptr = self.ptr.checked_add(frame.size).ok_or(DemoParserError::MalformedMessage)?;
 
             let ok = match frame.demo_cmd {
                 DemSignonPacket => self.parse_packet(&bytes, &mut buf2),
@@ -187,10 +176,11 @@ impl<'a> SecondPassParser<'a> {
         })
     }
     fn slice_packet_bytes(&mut self, demo_bytes: &'a [u8], frame_size: usize) -> Result<&'a [u8], DemoParserError> {
-        if self.ptr + frame_size as usize >= demo_bytes.len() {
+        let frame_ends_at = self.ptr.checked_add(frame_size).ok_or(DemoParserError::MalformedMessage)?;
+        if frame_ends_at > demo_bytes.len() {
             return Err(DemoParserError::MalformedMessage);
         }
-        Ok(&demo_bytes[self.ptr..self.ptr + frame_size])
+        Ok(&demo_bytes[self.ptr..frame_ends_at])
     }
     fn decompress_if_needed<'b>(&mut self, buf: &'b mut Vec<u8>, possibly_uncompressed_bytes: &'b [u8], frame: &Frame) -> Result<&'b [u8], DemoParserError> {
         match frame.is_compressed {

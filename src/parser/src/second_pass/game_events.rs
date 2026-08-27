@@ -111,7 +111,10 @@ impl<'a> SecondPassParser<'a> {
         // Parsing game events is this easy, the complexity comes from adding "extra" fields into events.
         for i in 0..event.keys.len() {
             let ge = &event.keys[i];
-            let desc = &event_desc.keys[i];
+            let desc = match event_desc.keys.get(i) {
+                Some(desc) => desc,
+                None => return Ok(None),
+            };
             let val = parse_key(ge);
             event_fields.push(EventField {
                 name: desc.name().to_owned(),
@@ -468,8 +471,8 @@ impl<'a> SecondPassParser<'a> {
             Err(_e) => return Err(DemoParserError::MalformedMessage),
         };
         if let Some(convars) = &convar.convars {
-            let mut fields = vec![];
             for var in &convars.cvars {
+                let mut fields = vec![];
                 fields.push(EventField {
                     data: Some(Variant::String(var.value().to_owned())),
                     name: "value".to_string(),

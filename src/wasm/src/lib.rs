@@ -199,8 +199,7 @@ pub fn listUpdatedFields(fileBytes: Vec<u8>) -> Result<JsValue, JsError> {
         Ok(output) => output,
         Err(e) => return Err(JsError::new(&format!("{}", e))),
     };
-    let v = Vec::from_iter(output.game_events_counter.iter());
-    match serde_wasm_bindgen::to_value(&v) {
+    match serde_wasm_bindgen::to_value(&output.uniq_prop_names) {
         Ok(s) => Ok(s),
         Err(e) => return Err(JsError::new(&format!("{}", e))),
     }
@@ -321,7 +320,7 @@ pub fn parseGrenades(
         wanted_events: vec![],
         parse_ents: true,
         wanted_ticks: vec![],
-        parse_projectiles: false,
+        parse_projectiles: true,
         only_header: false,
         list_props: false,
         only_convars: false,

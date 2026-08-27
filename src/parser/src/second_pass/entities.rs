@@ -46,6 +46,7 @@ pub enum EntityType {
     C4,
 }
 enum EntityCmd {
+    Leave,
     Delete,
     CreateAndUpdate,
     Update,
@@ -68,7 +69,7 @@ impl<'a> SecondPassParser<'a> {
             entity_id += 1 + (bitreader.read_u_bit_var()? as i32);
             // Read 2 bits to know which operation should be done to the entity.
             let cmd = match bitreader.read_nbits(2)? {
-                0b01 => EntityCmd::Delete,
+                0b01 => EntityCmd::Leave,
                 0b11 => EntityCmd::Delete,
                 0b10 => EntityCmd::CreateAndUpdate,
                 0b00 => EntityCmd::Update,
@@ -76,6 +77,7 @@ impl<'a> SecondPassParser<'a> {
             };
 
             match cmd {
+                EntityCmd::Leave => {}
                 EntityCmd::Delete => {
                     self.projectiles.remove(&entity_id);
                     if let Some(entry) = self.entities.get_mut(entity_id as usize) {

@@ -695,9 +695,23 @@ impl<'a> SecondPassParser<'a> {
             CoordinateAxis::Y => self.output.get(&PLAYER_Y_ID),
             CoordinateAxis::Z => self.output.get(&PLAYER_Z_ID),
         };
-        if let Some(c) = col {
+        if let (
+            Some(c),
+            Some(PropColumn {
+                data: Some(VarVec::I32(ticks)),
+                ..
+            }),
+        ) = (col, self.output.get(&TICK_ID))
+        {
             if let Some((Some(v1), Some(v2))) = self.index_coordinates_from_propcol(c, indicies) {
-                return Ok(Variant::F32((v1 * 64.0) - (v2 * 64.0)));
+                if let [idx1, idx2] = indicies {
+                    if let (Some(tick1), Some(tick2)) = (ticks[*idx1], ticks[*idx2]) {
+                        let elapsed_ticks = tick1 - tick2;
+                        if elapsed_ticks > 0 {
+                            return Ok(Variant::F32((v1 - v2) * 64.0 / elapsed_ticks as f32));
+                        }
+                    }
+                }
             }
         }
         return Err(PropCollectionError::VelocityNotFound);
